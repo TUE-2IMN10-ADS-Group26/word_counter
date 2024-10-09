@@ -1,1 +1,11 @@
+# IntelliJ IDEA
 .idea/
+*.iml
+# Rust && Cargo
+*/target/
+**/*.rs.bk
+*.rlib
+*.d
+*.lock
+# Mac OS X temporary files
+.DS_Store
