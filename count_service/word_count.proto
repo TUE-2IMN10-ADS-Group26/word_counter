@@ -1,0 +1,19 @@
+// 使用 Protocol Buffers 定义gRPC的接口
+
+syntax = "proto3";
+
+service WordCount {
+    // 定义词频统计服务的接口
+    rpc CountWords(WordCountRequest) returns (WordCountResponse);
+}
+
+// 客户端请求消息，包含关键词和文本 ID
+message WordCountRequest {
+    string keyword = 1;
+    string text_id = 2;
+}
+
+// 服务器响应消息，返回关键词的计数
+message WordCountResponse {
+    int32 count = 1;
+}
