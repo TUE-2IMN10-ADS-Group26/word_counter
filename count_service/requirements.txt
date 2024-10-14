@@ -1,5 +1,0 @@
-grpcio
-grpcio-tools
-grpcio-reflection  
-redis
-protobuf

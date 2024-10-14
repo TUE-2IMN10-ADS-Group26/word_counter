@@ -1,14 +1,19 @@
-version: '3.8'
+version: '3'
 
 services:
-  count_service:
-    build: .
+  redis:
+    image: "redis:alpine"
     ports:
-      - "50051:50051"  # 将容器内的 50051 端口映射到主机的 50051 端口
+      - "6379:6379"
+
+  server:
+    build: ./server
+    ports:
+      - "50051:50051"
     depends_on:
       - redis
 
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"  # 将容器内的 6379 端口映射到主机的 6379 端口
+  client:
+    build: ./client
+    depends_on:
+      - server

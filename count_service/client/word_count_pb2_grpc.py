@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class WordCountStub(object):
+class CounterStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -34,44 +34,43 @@ class WordCountStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.CountWords = channel.unary_unary(
-                '/WordCount/CountWords',
+        self.Count = channel.unary_unary(
+                '/word_counter.Counter/Count',
                 request_serializer=word__count__pb2.WordCountRequest.SerializeToString,
                 response_deserializer=word__count__pb2.WordCountResponse.FromString,
                 _registered_method=True)
 
 
-class WordCountServicer(object):
+class CounterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def CountWords(self, request, context):
-        """定义词频统计服务的接口
-        """
+    def Count(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_WordCountServicer_to_server(servicer, server):
+def add_CounterServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'CountWords': grpc.unary_unary_rpc_method_handler(
-                    servicer.CountWords,
+            'Count': grpc.unary_unary_rpc_method_handler(
+                    servicer.Count,
                     request_deserializer=word__count__pb2.WordCountRequest.FromString,
                     response_serializer=word__count__pb2.WordCountResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'WordCount', rpc_method_handlers)
+            'word_counter.Counter', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('WordCount', rpc_method_handlers)
+    server.add_registered_method_handlers('word_counter.Counter', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class WordCount(object):
+class Counter(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def CountWords(request,
+    def Count(request,
             target,
             options=(),
             channel_credentials=None,
@@ -84,7 +83,7 @@ class WordCount(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/WordCount/CountWords',
+            '/word_counter.Counter/Count',
             word__count__pb2.WordCountRequest.SerializeToString,
             word__count__pb2.WordCountResponse.FromString,
             options,

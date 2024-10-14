@@ -24,17 +24,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10word_count.proto\"4\n\x10WordCountRequest\x12\x0f\n\x07keyword\x18\x01 \x01(\t\x12\x0f\n\x07text_id\x18\x02 \x01(\t\"\"\n\x11WordCountResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x05\x32@\n\tWordCount\x12\x33\n\nCountWords\x12\x11.WordCountRequest\x1a\x12.WordCountResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10word_count.proto\x12\x0cword_counter\"3\n\x10WordCountRequest\x12\x0c\n\x04word\x18\x01 \x01(\t\x12\x11\n\tfile_name\x18\x02 \x01(\t\"b\n\x11WordCountResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12\x14\n\x0bstatus_code\x18\xfe\x01 \x01(\x03\x12\x17\n\x0estatus_message\x18\xff\x01 \x01(\t\x12\x0f\n\x06log_id\x18\x80\x02 \x01(\t2S\n\x07\x43ounter\x12H\n\x05\x43ount\x12\x1e.word_counter.WordCountRequest\x1a\x1f.word_counter.WordCountResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'word_count_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_WORDCOUNTREQUEST']._serialized_start=20
-  _globals['_WORDCOUNTREQUEST']._serialized_end=72
-  _globals['_WORDCOUNTRESPONSE']._serialized_start=74
-  _globals['_WORDCOUNTRESPONSE']._serialized_end=108
-  _globals['_WORDCOUNT']._serialized_start=110
-  _globals['_WORDCOUNT']._serialized_end=174
+  _globals['_WORDCOUNTREQUEST']._serialized_start=34
+  _globals['_WORDCOUNTREQUEST']._serialized_end=85
+  _globals['_WORDCOUNTRESPONSE']._serialized_start=87
+  _globals['_WORDCOUNTRESPONSE']._serialized_end=185
+  _globals['_COUNTER']._serialized_start=187
+  _globals['_COUNTER']._serialized_end=270
 # @@protoc_insertion_point(module_scope)
