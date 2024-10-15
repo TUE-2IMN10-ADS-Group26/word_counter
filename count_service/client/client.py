@@ -1,29 +1,22 @@
 import grpc
 import word_count_pb2
 import word_count_pb2_grpc
+import asyncio
 
-def run():
-    # 连接到 gRPC 服务器
-    with grpc.insecure_channel('localhost:50051') as channel:
+async def run():
+    async with grpc.aio.insecure_channel('server:50051') as channel:
         stub = word_count_pb2_grpc.CounterStub(channel)
 
-        # 输入关键词和文件名
+        # 输入参数
         word = input("Enter the keyword: ")
         file_name = input("Enter the file name (e.g., 1.txt): ")
+        phase = input("Enter the phase (1 for phase1, 2 for phase2): ")
 
-        # 构造请求
+        # 构建请求
         request = word_count_pb2.WordCountRequest(word=word, file_name=file_name)
+        response = await stub.Count(request)
 
-        try:
-            # 发送请求并获取响应
-            response = stub.Count(request)
-
-            # 输出返回结果
-            print(f"Keyword count: {response.count}")
-            print(f"Status code: {response.status_code}, Status message: {response.status_message}")
-
-        except grpc.RpcError as e:
-            print(f"gRPC Error: {e.code()} - {e.details()}")
+        print(f"Count: {response.count}, Status: {response.status_message}")
 
 if __name__ == "__main__":
-    run()
+    asyncio.run(run())

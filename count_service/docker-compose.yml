@@ -1,19 +1,21 @@
-version: '3'
+version: '3.8' 
 
 services:
   redis:
-    image: "redis:alpine"
+    image: redis:alpine
     ports:
       - "6379:6379"
-
+  
   server:
-    build: ./server
+    build:
+      context: ./server
     ports:
       - "50051:50051"
     depends_on:
       - redis
-
+  
   client:
-    build: ./client
+    build:
+      context: ./client
     depends_on:
       - server

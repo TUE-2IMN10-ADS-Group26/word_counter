@@ -1,57 +1,31 @@
 # 演示计算词频功能
 
 
-## 1. 安装
+## 1. 生成protobuf文件
 
 ```bash
-pip install -r server/requirements.txt  # 安装服务端依赖
-pip install -r client/requirements.txt  # 安装客户端依赖
-```
-
-
-## 2. 生成 gRPC 代码
-1. 
-```bash
-cd server  # 切换到 server 文件夹
 python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. word_count.proto
 ```
 
-2. 
+
+## 2. 启动protobuf文件
 ```bash
-cd ../client  # 切换到 client 文件夹
 python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. word_count.proto
 ```
 
-## 3. 构建Docker 镜像
-1. 
+## 3. 启动Docker服务
 ```bash
-cd ../server  # 切换到 server 文件夹
-docker build -t myserver .
-```
-
-2. 
-```bash
-cd ../client  # 切换到 client 文件夹
-docker build -t myclient .
-```
-
-## 4. 使用 Docker Compose 启动所有服务
-```bash
-cd ..  # 切换到 Lab 根目录
 docker-compose up --build
 ```
 
-## 5. 运行客户端
+## 4. 在另一个终端中运行客户端
 ```bash
-python client.py
+docker run -it --rm --network lab_default lab-client
 ```
 
-## 6. 检查 Redis 中的缓存
-
+## 5. 结果示例
 ```bash
-docker ps  # 查看正在运行的容器
-
-docker exec -it <redis_container_id> redis-cli
-
-GET "1:sample"  # 查看缓存中 'sample' 关键词在 text_id 为 1 的文本中的计数
+Enter the file name (e.g., 1.txt): 1.txt
+Enter the phase (1 for phase1, 2 for phase2): 1
+Count: 2, Status: 计算并存储的结果
 ```
