@@ -1,17 +1,17 @@
-# server/Dockerfile
+# 使用 Python 3.9 slim 版本作为基础镜像
 FROM python:3.9-slim
 
+# 设置工作目录
 WORKDIR /app
 
-# 复制 proto 文件夹
-COPY count_service/ .
+# 将当前目录的内容复制到容器的 /app 目录
+COPY server/ .
+
+# 从上一级的 proto 文件夹复制到容器中
 COPY ../../proto /app/proto
-ENV PROTO_PATH=/app/proto/word_counter.proto
 
-# 复制 server.py 和 texts 文件夹
-COPY ./server.py /app/
-COPY ./texts /app/texts
+# 安装依赖
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir grpcio grpcio-tools protobuf redis
-
+# 运行服务器
 CMD ["python", "server.py"]

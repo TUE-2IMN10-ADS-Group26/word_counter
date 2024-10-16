@@ -1,8 +1,10 @@
-version: '3'
+version: '3.8'
+
 services:
   server:
     build:
-      context: ./server
+      context: ./count_service/server
+    container_name: lab-server
     ports:
       - "50051:50051"
     depends_on:
@@ -10,12 +12,22 @@ services:
 
   client:
     build:
-      context: ./client
+      context: ./count_service/client
+    container_name: lab-client
     depends_on:
       - server
-      - redis
+
+  load_balancer:
+    build:
+      context: ./load_balancer
+    container_name: lab-load-balancer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - server
 
   redis:
-    image: "redis:alpine"
+    image: redis:alpine
+    container_name: lab-redis
     ports:
       - "6379:6379"
