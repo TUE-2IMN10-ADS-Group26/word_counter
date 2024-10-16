@@ -15,6 +15,7 @@ use tonic_health::pb::HealthCheckRequest;
 use word_counter::counter_client::CounterClient;
 use word_counter::WordCountRequest;
 
+use crate::metrics::QueryCounter;
 use crate::model::endpoints_config::EndpointConfig;
 
 pub mod word_counter {
@@ -137,23 +138,33 @@ impl Endpoint for WordCountServer {
     }
 
     async fn handle(&self, req: &str) -> Result<String> {
+        // metrics
+        let mut metrics_guard = QueryCounter::new(&self.name(), "WordCount");
+
         let req = Self::parse(req)?;
         let mut client = self.counter_client().ok_or_else(|| anyhow!("handle request failed"))?;
         let resp = client.count(req).await
             .context("call count service failed")?;
         let resp = serde_json::to_string(resp.get_ref())?;
+
+        metrics_guard.mark_success();
         Ok(resp)
     }
 
     async fn health_check(&self) {
+        // metrics
+        let mut metrics_guard = QueryCounter::new(&self.name(), "HealthCheck");
+
         let req = Request::new(HealthCheckRequest::default());
         let mut status = ServingStatus::NotServing as i32;
         if let Some(mut health_client) = self.health_client() {
             if let Ok(response) = health_client.check(req).await {
+                metrics_guard.mark_success();
                 status = response.into_inner().status;
             }
         }
         self.update_health_status(status);
+
         return;
     }
 
