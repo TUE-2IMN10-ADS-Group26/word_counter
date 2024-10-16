@@ -2,8 +2,9 @@ import grpc
 from concurrent import futures
 import redis
 import asyncio
-import word_count_pb2
-import word_count_pb2_grpc
+from proto import word_count_pb2
+from proto import word_count_pb2_grpc
+
 
 class CounterServicer(word_count_pb2_grpc.CounterServicer):
     def __init__(self):

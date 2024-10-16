@@ -1,7 +1,8 @@
 import grpc
-import word_count_pb2
-import word_count_pb2_grpc
 import asyncio
+from proto import word_count_pb2
+from proto import word_count_pb2_grpc
+
 
 async def run():
     async with grpc.aio.insecure_channel('server:50051') as channel:

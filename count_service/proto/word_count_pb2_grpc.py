@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import word_count_pb2 as word__count__pb2
+from proto import word_count_pb2 as proto_dot_word__count__pb2
 
 GRPC_GENERATED_VERSION = '1.66.2'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in word_count_pb2_grpc.py depends on'
+        + f' but the generated code in proto/word_count_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,8 +36,8 @@ class CounterStub(object):
         """
         self.Count = channel.unary_unary(
                 '/word_counter.Counter/Count',
-                request_serializer=word__count__pb2.WordCountRequest.SerializeToString,
-                response_deserializer=word__count__pb2.WordCountResponse.FromString,
+                request_serializer=proto_dot_word__count__pb2.WordCountRequest.SerializeToString,
+                response_deserializer=proto_dot_word__count__pb2.WordCountResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,8 +55,8 @@ def add_CounterServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Count': grpc.unary_unary_rpc_method_handler(
                     servicer.Count,
-                    request_deserializer=word__count__pb2.WordCountRequest.FromString,
-                    response_serializer=word__count__pb2.WordCountResponse.SerializeToString,
+                    request_deserializer=proto_dot_word__count__pb2.WordCountRequest.FromString,
+                    response_serializer=proto_dot_word__count__pb2.WordCountResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -84,8 +84,8 @@ class Counter(object):
             request,
             target,
             '/word_counter.Counter/Count',
-            word__count__pb2.WordCountRequest.SerializeToString,
-            word__count__pb2.WordCountResponse.FromString,
+            proto_dot_word__count__pb2.WordCountRequest.SerializeToString,
+            proto_dot_word__count__pb2.WordCountResponse.FromString,
             options,
             channel_credentials,
             insecure,
