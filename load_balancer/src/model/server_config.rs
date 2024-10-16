@@ -5,13 +5,14 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::consts::{DEFAULT_IP_ADDR, DEFAULT_PORT};
+use crate::consts::{DEFAULT_IP_ADDR, DEFAULT_METRICS_PORT, DEFAULT_PORT};
 use crate::endpoint::word_counter::WordCountResponse;
 
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     ip: Option<Ipv4Addr>,
     port: Option<u16>,
+    metrics_port: Option<u16>,
     enable_fault_tolerance: Option<bool>,
 }
 
@@ -36,8 +37,19 @@ impl ServerConfig {
         })
     }
 
+    pub fn metrics_port(&self) -> u16 {
+        self.metrics_port.unwrap_or_else(|| {
+            tracing::error!("metrics port is None, using default value");
+            DEFAULT_METRICS_PORT
+        })
+    }
+
     pub fn get_socket_addr(&self) -> SocketAddr {
         SocketAddr::new((*self.ip()).into(), self.port())
+    }
+
+    pub fn get_metrics_addr(&self) -> SocketAddr {
+        SocketAddr::new((*self.ip()).into(), self.metrics_port())
     }
 
     pub fn fault_tolerance(&self) -> bool {
@@ -70,10 +82,12 @@ mod test {
         let expected = ServerConfig {
             ip: Some("192.168.1.1".parse().unwrap()),
             port: Some(8080),
+            metrics_port: Some(8081),
             enable_fault_tolerance: Some(true),
         };
         assert_eq!(server_config.ip, expected.ip);
         assert_eq!(server_config.port, expected.port);
+        assert_eq!(server_config.metrics_port, expected.metrics_port);
         assert_eq!(server_config.enable_fault_tolerance, expected.enable_fault_tolerance);
     }
 }
