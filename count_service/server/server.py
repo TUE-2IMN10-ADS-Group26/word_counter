@@ -1,7 +1,8 @@
 import grpc
 from concurrent import futures
 import redis
-from proto import word_count_pb2_grpc, word_count_pb2  # 从共享目录引入proto文件
+from count_service.client import word_count_pb2_grpc
+from count_service.client import word_count_pb2  # 从共享目录引入proto文件
 import os
 import time
 from grpc_health.v1 import health, health_pb2_grpc
@@ -38,7 +39,7 @@ class CounterServicer(word_count_pb2_grpc.CounterServicer):
             r.set(cache_key, count, ex=3600)  # 1小时
             return word_count_pb2.WordCountResponse(count=count, status_message="计算并存储的结果")
         else:
-            r.set(cache_key, 0, ex=300)  # 5分钟
+            r.set(cache_key, 0, ex=15)  
             return word_count_pb2.WordCountResponse(count=0, status_message="词不存在")
 
 def serve():
