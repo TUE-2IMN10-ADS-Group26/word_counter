@@ -1,6 +1,8 @@
 # IntelliJ IDEA
 .idea/
 *.iml
+# Python
+*__pycache__
 # Rust && Cargo
 */target/
 **/*.rs.bk

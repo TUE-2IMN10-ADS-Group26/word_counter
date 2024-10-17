@@ -1,7 +1,7 @@
 import grpc
 import asyncio
-from proto import word_count_pb2, word_count_pb2_grpc  # 从共享目录引入proto文件
-import asyncio
+from count_service.proto_gen import word_counter_pb2_grpc
+from count_service.proto_gen import word_counter_pb2  # 从共享目录引入proto文件import asyncio
 import argparse  
 
 
@@ -9,12 +9,12 @@ async def run(word, file_name, phase):
     # 创建gRPC频道
     async with grpc.aio.insecure_channel('server:50051') as channel:
         # 创建客户端
-        stub = word_count_pb2_grpc.WordCounterStub(channel)
+        stub = word_counter_pb2_grpc.WordCounterStub(channel)
         # 读取文本文件
         with open(file_name, 'r') as f:
             text = f.read()
         # 创建请求
-        request = word_count_pb2.WordCountRequest(
+        request = word_counter_pb2.WordCountRequest(
             word=word,
             text_id=file_name,
             text=text
