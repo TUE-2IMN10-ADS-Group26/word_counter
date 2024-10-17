@@ -29,7 +29,7 @@ services:
     image: lab-server-image
     container_name: lab-server2
     ports:
-      - "50051:50051"
+      - "50052:50051"
     depends_on:
       - redis
     networks:
@@ -40,7 +40,7 @@ services:
     image: lab-server-image
     container_name: lab-server3
     ports:
-      - "50051:50051"
+      - "50053:50051"
     depends_on:
       - redis
     networks:
