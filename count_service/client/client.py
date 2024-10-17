@@ -1,8 +1,5 @@
 import grpc
 import asyncio
-import os
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'proto_gen')))
 
 import word_counter_pb2
 import word_counter_pb2_grpc
@@ -18,9 +15,7 @@ async def run(word, file_name, phase):
     async with grpc.aio.insecure_channel('server:50051') as channel:
         # 创建客户端
         stub = word_counter_pb2_grpc.CounterStub(channel)
-        # 读取文本文件
-        with open(file_name, 'r') as f:
-            text = f.read()
+        
         # 创建请求
         request = word_counter_pb2.WordCountRequest(
             word=word,
@@ -73,12 +68,12 @@ def get_most_frequent_words(n):
     
     return most_common_words
 
-asyncio.run(batchRun("count_service/server/texts/test.txt", 30, 1))
+# asyncio.run(batchRun("test.txt", 30, 1))
 
-# if __name__ == "__main__":
-#     # 解析命令行参数
-#     args = parse_arguments()
+if __name__ == "__main__":
+    # 解析命令行参数
+    args = parse_arguments()
 
-#     # 运行客户端
-#     asyncio.run(run(args.word, args.file_name, args.phase))
+    # 运行客户端
+    asyncio.run(run(args.word, args.file_name, args.phase))
 

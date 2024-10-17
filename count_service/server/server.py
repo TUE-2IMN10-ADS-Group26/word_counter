@@ -1,18 +1,13 @@
 import grpc
 from concurrent import futures
 import redis
-import sys
-import os
-
-# 添加 proto_gen 到系统路径
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'proto_gen')))
 
 # 然后导入生成的模块
 import word_counter_pb2
 import word_counter_pb2_grpc
 import os
 import time
-from grpc_health.v1 import health, health_pb2_grpc,health_pb2
+from grpc_health.v1 import health, health_pb2_grpc, health_pb2
 
 r = redis.Redis(host='redis', port=6379, db=0)
 
