@@ -1,0 +1,92 @@
+version: '3.8'
+
+networks:
+  lab_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
+
+services:
+  server_image:
+    build:
+      context: .
+      dockerfile: ./count_service/server/Dockerfile
+    image: lab-server-image
+
+  server1:
+    image: lab-server-image
+    container_name: lab-server1
+    ports:
+      - "50051:50051"
+    depends_on:
+      - redis
+    networks:
+      lab_network:
+        ipv4_address: 192.168.1.10
+
+  server2:
+    image: lab-server-image
+    container_name: lab-server2
+    ports:
+      - "50051:50051"
+    depends_on:
+      - redis
+    networks:
+      lab_network:
+        ipv4_address: 192.168.1.11
+
+  server3:
+    image: lab-server-image
+    container_name: lab-server3
+    ports:
+      - "50051:50051"
+    depends_on:
+      - redis
+    networks:
+      lab_network:
+        ipv4_address: 192.168.1.12
+
+  client:
+    build:
+      context: .
+      dockerfile: ./count_service/client/Dockerfile
+    container_name: lab-client
+    depends_on:
+      - server1
+    networks:
+      - lab_network
+
+  load_balancer:
+    build:
+      context: .
+      dockerfile: ./load_balancer/Dockerfile
+    container_name: lab-load-balancer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - server1
+      - server2
+      - server3
+    networks:
+      - lab_network
+
+  redis:
+    image: redis:alpine
+    container_name: lab-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - lab_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lab-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - lab_network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'

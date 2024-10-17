@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # 将当前目录的内容复制到容器的 /app 目录
-COPY server/ .
+COPY count_service/server/ .
 
 # 从上一级的 proto 文件夹复制到容器中
 COPY ../../proto /app/proto
