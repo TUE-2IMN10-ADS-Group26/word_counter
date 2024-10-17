@@ -28,12 +28,13 @@ class CounterServicer(word_count_pb2_grpc.CounterServicer):
             return word_count_pb2.WordCountResponse(count=0, status_message="文件不存在")
 
         count = 0
-        with open(file_path, 'r') as f:
-            for line in f:
-                count += line.lower().split().count(word.lower())  # 逐行读取并计数
+        # 使用 buffered read 方法
+        with open(file_path, 'r', buffering=1024 * 1024) as f:  # 1MB 的缓冲区
+            content = f.read()  # 一次性读取整个文件
+            count = content.lower().split().count(word.lower())  # 计算词频
 
         # 存储到 Redis 中，设置不同的缓存时间
-        if count > 0:
+        if count > 0:  
             r.set(cache_key, count, ex=3600)  # 1小时
             return word_count_pb2.WordCountResponse(count=count, status_message="计算并存储的结果")
         else:
