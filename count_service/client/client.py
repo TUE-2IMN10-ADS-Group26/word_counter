@@ -1,19 +1,47 @@
 import grpc
 import asyncio
 from proto import word_count_pb2, word_count_pb2_grpc  # 从共享目录引入proto文件
+import asyncio
+import argparse  
 
-async def run():
+
+async def run(word, file_name, phase):
+    # 创建gRPC频道
     async with grpc.aio.insecure_channel('server:50051') as channel:
-        stub = word_count_pb2_grpc.CounterStub(channel)
+        # 创建客户端
+        stub = word_count_pb2_grpc.WordCounterStub(channel)
+        # 读取文本文件
+        with open(file_name, 'r') as f:
+            text = f.read()
+        # 创建请求
+        request = word_count_pb2.WordCountRequest(
+            word=word,
+            text_id=file_name,
+            text=text
+        )
         
-        word = input("Enter the keyword: ")
-        file_name = input("Enter the file name (e.g., 1.txt): ")
-        phase = input("Enter the phase (1 for phase1, 2 for phase2): ")
+        # 根据phase的不同，进行不同的处理
+        if phase == 1:
+            response = await stub.Count(request)
+        elif phase == 2:
+            # 如果有负载均衡的逻辑，则实现
+            response = await stub.LoadBalanceCount(request)
+        else:
+            print(f"Unknown phase: {phase}")
+            return
+        print(f"Count: {response.count}, Status: {response.status}")
 
-        request = word_count_pb2.WordCountRequest(word=word, file_name=file_name)
-        response = await stub.Count(request)
-        
-        print(f"Count: {response.count}, Status: {response.status_message}")
+def parse_arguments():
+    # 定义命令行参数
+    parser = argparse.ArgumentParser(description="gRPC Client for Word Counting")
+    parser.add_argument('word', type=str, help="The word to count")
+    parser.add_argument('file_name', type=str, help="The text file name (e.g., 1.txt)")
+    parser.add_argument('phase', type=int, choices=[1, 2], help="Phase: 1 for default server, 2 for load balancing")
+    return parser.parse_args()
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    # 解析命令行参数
+    args = parse_arguments()
+
+    # 运行客户端
+    asyncio.run(run(args.word, args.file_name, args.phase))
