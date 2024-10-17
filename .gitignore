@@ -1,6 +1,8 @@
 # IntelliJ IDEA
 .idea/
 *.iml
+# VS code
+.vscode/
 # Python
 *__pycache__
 # Rust && Cargo

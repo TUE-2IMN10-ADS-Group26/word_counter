@@ -1,12 +1,18 @@
 import grpc
 from concurrent import futures
 import redis
-from count_service.proto_gen import word_counter_pb2_grpc
-from count_service.proto_gen import word_counter_pb2  # 从共享目录引入proto文件
+import sys
+import os
+
+# 添加 proto_gen 到系统路径
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'proto_gen')))
+
+# 然后导入生成的模块
+import word_counter_pb2
+import word_counter_pb2_grpc
 import os
 import time
-from grpc_health.v1 import health, health_pb2_grpc
-
+from grpc_health.v1 import health, health_pb2_grpc,health_pb2
 
 r = redis.Redis(host='redis', port=6379, db=0)
 
@@ -46,14 +52,14 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
     # 注册 WordCountService 服务
-    word_counter_pb2_grpc.add_WordCounterServicer_to_server(CounterServicer(), server)
+    word_counter_pb2_grpc.add_CounterServicer_to_server(CounterServicer(), server)
 
     # 健康检查服务
     health_servicer = health.HealthServicer()  # 创建健康检查服务
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
     # 设置健康状态为 SERVING
-    health_servicer.set("grpc.health.v1.Health", health_pb2_grpc.HealthCheckResponse.SERVING)
+    health_servicer.set("grpc.health.v1.Health", health_pb2.HealthCheckResponse.SERVING)
 
     server.add_insecure_port('[::]:50051')
     server.start()

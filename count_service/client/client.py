@@ -1,23 +1,30 @@
 import grpc
 import asyncio
-from count_service.proto_gen import word_counter_pb2_grpc
-from count_service.proto_gen import word_counter_pb2  # 从共享目录引入proto文件import asyncio
-import argparse  
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'proto_gen')))
 
+import word_counter_pb2
+import word_counter_pb2_grpc
+import argparse  
+import nltk
+from collections import Counter
+
+nltk.download('words')
+from nltk.corpus import words
 
 async def run(word, file_name, phase):
     # 创建gRPC频道
     async with grpc.aio.insecure_channel('server:50051') as channel:
         # 创建客户端
-        stub = word_counter_pb2_grpc.WordCounterStub(channel)
+        stub = word_counter_pb2_grpc.CounterStub(channel)
         # 读取文本文件
         with open(file_name, 'r') as f:
             text = f.read()
         # 创建请求
         request = word_counter_pb2.WordCountRequest(
             word=word,
-            text_id=file_name,
-            text=text
+            file_name=file_name,
         )
         
         # 根据phase的不同，进行不同的处理
@@ -39,9 +46,39 @@ def parse_arguments():
     parser.add_argument('phase', type=int, choices=[1, 2], help="Phase: 1 for default server, 2 for load balancing")
     return parser.parse_args()
 
-if __name__ == "__main__":
-    # 解析命令行参数
-    args = parse_arguments()
 
-    # 运行客户端
-    asyncio.run(run(args.word, args.file_name, args.phase))
+async def batchRun(file_name, n, phase):
+    
+    words = get_most_frequent_words(n)
+    tasks = []
+    for word in words:
+        tasks.append(run(word, file_name, phase))
+        await asyncio.sleep(0.02)
+    results = await asyncio.gather(*tasks)
+    for result in results:
+        print(result)
+
+
+
+def get_most_frequent_words(n):
+    # List of all words in the nltk word corpus
+    word_list = words.words()
+    
+    # Create a Counter object to count the frequency of each word
+    word_counts = Counter(word_list)
+    
+    # Get the 'n' most common words
+    most_common_words = [word for word, count in word_counts.most_common(n)]
+    print("most_common_words: ", most_common_words)
+    
+    return most_common_words
+
+asyncio.run(batchRun("count_service/server/texts/test.txt", 30, 1))
+
+# if __name__ == "__main__":
+#     # 解析命令行参数
+#     args = parse_arguments()
+
+#     # 运行客户端
+#     asyncio.run(run(args.word, args.file_name, args.phase))
+
