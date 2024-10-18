@@ -32,7 +32,7 @@ mod model {
     pub mod load_balancer_config;
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     // init ctrlc handler
     let running = Arc::new(AtomicBool::new(true));
@@ -43,13 +43,21 @@ async fn main() {
     tracing::info!("logger initiated");
 
     // metrics data server
-    AppBuilder::start_metrics_server().await;
-    tracing::info!("metrics server started");
+    let metrics_task = tokio::spawn(async {
+        AppBuilder::start_metrics_server().await;
+        tracing::info!("metrics server exit");
+    });
 
     // load balance server
-    let mut server = AppBuilder::build_lb_server().await.unwrap_or_else(|e| panic!("server init failed with error: {:?}", e));
-    server.start(running).await;
-    tracing::info!("load balance server started");
+    let lb_task = tokio::spawn(async {
+        let mut server = AppBuilder::build_lb_server().await.unwrap_or_else(|e| {
+            panic!("server init failed with error: {:?}", e)
+        });
+        server.start(running).await;
+        tracing::info!("load balance server exit");
+    });
+
+    let _ = tokio::join!(metrics_task, lb_task);
 }
 
 fn init_logger() -> WorkerGuard {

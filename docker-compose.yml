@@ -52,8 +52,11 @@ services:
     container_name: lab-client
     depends_on:
       - server1
+      - load_balancer
     networks:
       - lab_network
+    stdin_open: true
+    tty: true
 
   load_balancer:
     build:
@@ -89,3 +92,18 @@ services:
       - lab_network
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - lab_network
+    depends_on:
+      - prometheus
+
+volumes:
+  grafana_data:

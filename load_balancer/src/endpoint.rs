@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -62,7 +63,7 @@ impl WordCountServer {
     }
 
     async fn connect_channel(&mut self) -> Result<()> {
-        let uri: Uri = self.config.get_socket_addr().to_string().parse().unwrap();
+        let uri: Uri = Uri::from_str(&format!("http://{}", self.config.get_socket_addr())).context("format endpoint uri failed")?;
         // hardcoded connection configs, todo!
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
@@ -99,13 +100,13 @@ impl WordCountServer {
 
     fn health_client(&self) -> Option<HealthClient<Channel>> {
         self.health_client.get().cloned().or_else(|| {
-            tracing::error!("health client not initialized");
+            tracing::warn!("health client not initialized");
             None
         })
     }
 
     fn parse(req: &str) -> Result<Request<WordCountRequest>> {
-        let req: WordCountRequest = serde_json::from_str(req)?;
+        let req: WordCountRequest = serde_json::from_str(req).context("parse request failed")?;
         Ok(Request::new(req))
     }
 
@@ -141,11 +142,11 @@ impl Endpoint for WordCountServer {
         // metrics
         let mut metrics_guard = QueryCounter::new(&self.name(), "WordCount");
 
-        let req = Self::parse(req)?;
+        let req = Self::parse(req)
+            .context(format!("Endpoint handle failed, endpoint name={}, addr={:?}", self.config.name(), self.config.get_socket_addr()))?;
         let mut client = self.counter_client().ok_or_else(|| anyhow!("handle request failed"))?;
-        let resp = client.count(req).await
-            .context("call count service failed")?;
-        let resp = serde_json::to_string(resp.get_ref())?;
+        let resp = client.count(req).await.context("call count service failed")?;
+        let resp = serde_json::to_string(resp.get_ref()).context("serialize response failed")?;
 
         metrics_guard.mark_success();
         Ok(resp)

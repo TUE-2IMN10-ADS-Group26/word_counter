@@ -3,8 +3,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
 use anyhow::{anyhow, Result};
-use async_std::sync::Mutex;
-use async_std::task::spawn;
+use tokio::sync::Mutex;
+use tokio::task::spawn;
 use async_trait::async_trait;
 use futures::future::join_all;
 
@@ -64,11 +64,8 @@ impl LoadBalancer for LoadBalancerImpl
         self.router_strategy = Mutex::new(strategy);
     }
     async fn handle(&self, req: String) -> Result<String> {
-        let endpoint = self.pick_endpoint().await.ok_or_else(|| {
-            tracing::error!("[LoadBalancer] no proper endpoint selected");
-            anyhow!("assign endpoint failed, no proper endpoint found")
-        })?;
-        tracing::info!("[LoadBalancer] request forwarded to server [Name: {}, Addr:{}]", endpoint.name(), endpoint.addr());
+        let endpoint = self.pick_endpoint().await.ok_or_else(|| anyhow!("assign endpoint failed, no proper endpoint found"))?;
+        tracing::info!("[LoadBalancer] request forwarded to server [Name: {}, Addr:{}], request={}", endpoint.name(), endpoint.addr(), req);
         endpoint.handle(&req).await
     }
 
@@ -114,7 +111,7 @@ mod load_balancer_impl_tests {
 
     use super::*;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_health_maintain() {
         // healthy instances
         let mut endpoint1 = MockEndpoint::new();

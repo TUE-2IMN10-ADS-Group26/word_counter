@@ -11,8 +11,6 @@ lazy_static! {
         register_histogram_vec!(COUNTER_LATENCY, "server latency", &["server_name", "handler", "success"]).unwrap();
 }
 
-
-
 pub struct QueryCounter {
     query_success: bool,
     server_name: String,

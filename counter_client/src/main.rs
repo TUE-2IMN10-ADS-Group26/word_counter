@@ -1,5 +1,3 @@
-use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -7,13 +5,14 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use async_std::task;
 use clap::{Parser, Subcommand};
 use fake::Fake;
 use fake::faker::lorem::en::Word;
+use futures::future::join_all;
 use indicatif::ProgressIterator;
-use once_cell::sync::Lazy;
-use rayon::ThreadPoolBuilder;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::OnceCell;
 use tonic::Request;
 use tonic::transport::{Channel, Uri};
 
@@ -30,31 +29,41 @@ pub mod word_counter {
 struct CliParams {
     #[command(subcommand)]
     command: Commands,
-    #[arg(short, long)]
-    file_name: String,
-    #[arg(long)]
-    with_lb: bool,
 }
 
 #[derive(Subcommand, Clone)]
 enum Commands {
-    Count { word: String },
-    Random { batch: usize },
+    /// Count occurrences of a word in a file
+    Count {
+        #[arg(short, long, help = "query word")]
+        word: String,
+        #[arg(short, long, help = "target file name")]
+        file_name: String,
+        #[arg(long, default_value_t = false, help = "if use load balancer")]
+        with_lb: bool,
+    },
+    /// Count random words in a file
+    Random {
+        #[arg(short, long, help = "batch query num")]
+        batch: usize,
+        #[arg(short, long, help = "target file name")]
+        file_name: String,
+        #[arg(long, default_value_t = false, help = "if use load balancer")]
+        with_lb: bool,
+    },
 }
 
 #[derive(Clone)]
 struct ClientContext {
     params: CliParams,
-    client: Arc<Lazy<CounterClient<Channel>>>,
+    client: Arc<OnceCell<CounterClient<Channel>>>,
 }
 
 impl ClientContext {
     fn new(params: CliParams) -> Self {
         ClientContext {
             params,
-            client: Arc::new(Lazy::new(|| {
-                task::block_on(Self::init_client())
-            })),
+            client: Arc::new(OnceCell::new()),
         }
     }
 
@@ -66,7 +75,7 @@ impl ClientContext {
     }
 
     async fn init_channel() -> Result<Channel> {
-        let uri: Uri = Uri::from_str("server1:50051").context("parse server Uri failed")?;
+        let uri: Uri = Uri::from_str("http://server1:50051").context("parse server Uri failed")?;
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Some(Duration::from_secs(30)))
@@ -75,26 +84,40 @@ impl ClientContext {
         Ok(channel)
     }
 
-    fn get_client(&self) -> CounterClient<Channel> {
-        self.client.deref().deref().clone()
+    async fn get_client(&self) -> CounterClient<Channel> {
+        self.client.deref().get_or_init(|| async { Self::init_client().await }).await.clone()
     }
 
     fn try_get_query_word(&self) -> Option<String> {
-        if let Commands::Count { word } = &self.params.command {
+        if let Commands::Count { word, .. } = &self.params.command {
             return Some(word.clone());
         }
         None
     }
 
     fn try_get_batch_num(&self) -> Option<usize> {
-        if let Commands::Random { batch } = &self.params.command {
+        if let Commands::Random { batch, .. } = &self.params.command {
             return Some(batch.clone());
         }
         None
     }
+
+    fn get_file_name(&self) -> String {
+        match &self.params.command {
+            Commands::Count { file_name, .. } => { file_name.clone() }
+            Commands::Random { file_name, .. } => { file_name.clone() }
+        }
+    }
+
+    fn with_lb(&self) -> bool {
+        match &self.params.command {
+            Commands::Count { with_lb, .. } => { with_lb.clone() }
+            Commands::Random { with_lb, .. } => { with_lb.clone() }
+        }
+    }
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     let params = CliParams::parse();
     let mut client_ctx = ClientContext::new(params);
@@ -107,28 +130,24 @@ async fn exec(client_ctx: &mut ClientContext) {
             exec_query(client_ctx).await
         }
         Commands::Random { .. } => {
-            exec_random_query(client_ctx)
+            exec_random_query(client_ctx).await
         }
     }
 }
 
-fn exec_random_query(client_ctx: &mut ClientContext) {
-    let pool = ThreadPoolBuilder::new().build().expect("thread pool initialize failed");
-    let exec_task = || {
-        let mut client_ctx = client_ctx.clone();
-        pool.spawn(|| {
-            task::block_on(async move {
-                let req = build_random_request(&client_ctx);
-                let resp = call_count(&mut client_ctx, req.clone()).await;
-                display(req, resp);
-            });
-            thread::sleep(Duration::from_millis(500));
-        });
-    };
-
+async fn exec_random_query(client_ctx: &mut ClientContext) {
+    let mut handles = Vec::new();
     for _ in (0..client_ctx.try_get_batch_num().unwrap()).progress() {
-        exec_task();
+        let mut client_ctx = client_ctx.clone();
+        let handle = tokio::spawn(async move {
+            let req = build_random_request(&client_ctx);
+            let resp = call_count(&mut client_ctx, req.clone()).await;
+            display(req, resp);
+        });
+        handles.push(handle);
+        thread::sleep(Duration::from_millis(100));
     }
+    join_all(handles).await;
 }
 
 async fn exec_query(client_ctx: &mut ClientContext) {
@@ -149,8 +168,8 @@ fn display(req: WordCountRequest, resp: Result<WordCountResponse>) {
 }
 
 async fn call_count(client_ctx: &mut ClientContext, req: WordCountRequest) -> Result<WordCountResponse> {
-    if client_ctx.params.with_lb {
-        count_with_lb(req)
+    if client_ctx.with_lb() {
+        count_with_lb(req).await
     } else {
         count_without_lb(client_ctx, req).await
     }
@@ -159,33 +178,41 @@ async fn call_count(client_ctx: &mut ClientContext, req: WordCountRequest) -> Re
 fn build_request(client_ctx: &ClientContext) -> WordCountRequest {
     WordCountRequest {
         word: client_ctx.try_get_query_word().unwrap(), // should not panic
-        file_name: client_ctx.params.file_name.clone(),
+        file_name: client_ctx.get_file_name().clone(),
     }
 }
 
 fn build_random_request(client_ctx: &ClientContext) -> WordCountRequest {
     WordCountRequest {
         word: Word().fake(),
-        file_name: client_ctx.params.file_name.clone(),
+        file_name: client_ctx.get_file_name().clone(),
     }
 }
 
 // RPC
 async fn count_without_lb(client_ctx: &mut ClientContext, req: WordCountRequest) -> Result<WordCountResponse> {
-    let resp = client_ctx.get_client().count(Request::new(req)).await.context("call RPC method: count failed")?;
+    let resp = client_ctx.get_client().await.count(Request::new(req)).await.context("call RPC method: count failed")?;
     Ok(resp.into_inner())
 }
 
 // TCP
-fn count_with_lb(req: WordCountRequest) -> Result<WordCountResponse> {
-    let mut stream = TcpStream::connect("load_balancer:8080").context("init TCP stream failed")?;
-    stream.set_write_timeout(Some(Duration::from_millis(1000))).context("set TCP stream write timeout failed")?;
-    stream.set_read_timeout(Some(Duration::from_millis(1000))).context("set TCP stream read timeout failed")?;
-    let message = serde_json::to_vec(&req).context("TCP request serialize failed")?;
-    stream.write_all(&message).context("send TCP message failed")?;
-    let mut buffer = String::new();
-    stream.read_to_string(&mut buffer).context("read TCP stream failed")?;
-    let response: WordCountResponse = serde_json::from_str(&buffer).context("TCP response deserialize failed")?;
+async fn count_with_lb(req: WordCountRequest) -> Result<WordCountResponse> {
+    let mut stream = TcpStream::connect("load_balancer:8080").await.context("init TCP stream failed")?;
+
+    let message = serde_json::to_string(&req).context("TCP request serialize failed")?;
+    stream.write_u32(message.len() as u32).await.context("TCP stream fail to write message length")?;
+    stream.write_all(message.as_bytes()).await.context("TCP stream write message failed")?;
+
+    let mut len_buf = [0u8; 4];
+    stream.read_exact(&mut len_buf).await.context("failed to read response length")?;
+    let len = u32::from_be_bytes(len_buf) as usize;
+    let mut buffer = vec![0; len];
+    stream.read_exact(&mut buffer).await.context("failed to read response body")?;
+    let response = String::from_utf8(buffer).context("invalid response")?;
+
+    let response: WordCountResponse = serde_json::from_str(&response).with_context(|| {
+        format!("TCP response deserialize failed, resp={response}")
+    })?;
     Ok(response)
 }
 

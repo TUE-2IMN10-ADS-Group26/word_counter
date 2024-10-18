@@ -1,5 +1,8 @@
 use std::env;
+use std::net::SocketAddr;
+use std::str::FromStr;
 
+use anyhow::Context;
 use deadpool_redis::{Config, Pool, Runtime};
 use tonic::transport::Server;
 use tonic::transport::server::Router;
@@ -22,11 +25,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("redis poll initiated");
 
     // init server
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let addr: SocketAddr = init_socket_addr("0.0.0.0:50051");
     let server = init_server(pool).await;
     tracing::info!("CounterServer listening on {}", addr);
-    server.serve(addr)
-        .await?;
+    server.serve(addr).await.unwrap_or_else(|e| {
+        tracing::error!("CounterServer serve failed, err={:?}", e)
+    });
     Ok(())
 }
 
@@ -54,4 +58,19 @@ fn init_logger() -> WorkerGuard {
 fn init_redis_conn_pool() -> Pool {
     let cfg = Config::from_url(env::var("REDIS__URL").expect("init redis failed"));
     cfg.create_pool(Some(Runtime::Tokio1)).unwrap()
+}
+
+fn init_socket_addr(addr: &str) -> SocketAddr {
+    SocketAddr::from_str(addr).context("server addr parse failed").unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use crate::init_socket_addr;
+
+    #[test]
+    fn test_init_socket_addr() {
+        assert_eq!(init_socket_addr("127.0.0.1:50051"), SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50051));
+    }
 }

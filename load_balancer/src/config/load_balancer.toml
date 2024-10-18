@@ -1,1 +1,4 @@
-strategy = "RoundRobin"
+# supported strategies:
+# - RoundRobin
+# - WeightedRoundRobin
+strategy = "WeightedRoundRobin"
