@@ -1,17 +1,17 @@
 [[endpoints]]
 name = "s1"
-ip = "192.168.1.1"
-port = 8080
+ip = "192.168.1.10"
+port = 50051
 weight = 80
 
 [[endpoints]]
 name = "s2"
-ip = "192.168.1.2"
-port = 8081
+ip = "192.168.1.11"
+port = 50051
 weight = 10
 
 [[endpoints]]
 name = "s3"
-ip = "192.168.1.3"
-port = 8082
+ip = "192.168.1.12"
+port = 50051
 weight = 10
