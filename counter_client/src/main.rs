@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 use fake::Fake;
 use fake::faker::lorem::en::Word;
 use futures::future::join_all;
-use indicatif::ProgressIterator;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::OnceCell;
@@ -137,32 +137,46 @@ async fn exec(client_ctx: &mut ClientContext) {
 
 async fn exec_random_query(client_ctx: &mut ClientContext) {
     let mut handles = Vec::new();
-    for _ in (0..client_ctx.try_get_batch_num().unwrap()).progress() {
+    let total = client_ctx.try_get_batch_num().unwrap();
+    let bar = build_progress_bar(total);
+    for i in 0..total {
         let mut client_ctx = client_ctx.clone();
+        let bar = bar.clone();
         let handle = tokio::spawn(async move {
             let req = build_random_request(&client_ctx);
             let resp = call_count(&mut client_ctx, req.clone()).await;
-            display(req, resp);
+            bar.set_prefix(format!("{}/{}", i+1, total));
+            bar.inc(1);
+            bar.set_message(format!("{}", state_message(req, resp)));
         });
         handles.push(handle);
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(30));
     }
     join_all(handles).await;
+    bar.finish_with_message("🥳 all jobs done!");
+}
+
+fn build_progress_bar(total: usize) -> ProgressBar {
+    let progress = MultiProgress::new();
+    let style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner:.green} {wide_msg}").unwrap();
+    let bar = progress.add(ProgressBar::new(total as u64));
+    bar.set_style(style);
+    bar
 }
 
 async fn exec_query(client_ctx: &mut ClientContext) {
     let req = build_request(client_ctx);
     let resp = call_count(client_ctx, req.clone()).await;
-    display(req, resp)
+    println!("{}", state_message(req, resp));
 }
 
-fn display(req: WordCountRequest, resp: Result<WordCountResponse>) {
+fn state_message(req: WordCountRequest, resp: Result<WordCountResponse>) -> String {
     match resp {
         Ok(r) => {
-            println!("✅ call [Count] success, word: {} occur {} times in {}", req.word, r.count, req.file_name);
+            format!("✅ call [Count] success, word: {} occur {} times in {}", req.word, r.count, req.file_name)
         }
         Err(e) => {
-            println!("❌ call [Count] failed, request={:?}, err={:?}", req, e);
+            format!("❌ call [Count] failed, request={:?}, err={:?}", req, e)
         }
     }
 }
