@@ -1,0 +1,21 @@
+[package]
+name = "counter_service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+redis = "0.27.4"
+tonic = "0.12.3"
+serde = { version = "1.0.210", features = ["derive"] }
+anyhow = "1.0.89"
+moka = { version = "0.12.8", features = ["future"] }
+deadpool-redis = "0.18.0"
+tracing = "0.1.40"
+tracing-appender = "0.2.3"
+tracing-subscriber = "0.3.18"
+prost = "0.13.3"
+tokio = { version = "1.40.0", features = ["full"] }
+tonic-health = "0.12.3"
+
+[build-dependencies]
+tonic-build = "0.12"
