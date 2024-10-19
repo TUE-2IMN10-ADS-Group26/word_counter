@@ -2,4 +2,4 @@
 # - RoundRobin
 # - WeightedRoundRobin
 # - HashByRequest
-strategy = "HashByRequest"
+strategy = "WeightedRoundRobin"
