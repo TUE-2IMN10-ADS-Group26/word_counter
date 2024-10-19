@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use crate::consts;
-use crate::consts::WEIGHTED_ROUND_ROBIN;
 use crate::endpoint::Endpoint;
+use crate::strategy::context::StrategyContext;
 use crate::strategy::RouteStrategy;
 
 pub struct WeightedRoundRobin {
@@ -18,11 +18,6 @@ impl WeightedRoundRobin {
             curr_weight: 0,
             guard: Mutex::new(()),
         }
-    }
-
-    #[allow(dead_code)]
-    fn name() -> String {
-        return String::from(WEIGHTED_ROUND_ROBIN);
     }
 
     fn gcd(mut x: u8, mut y: u8) -> u8 {
@@ -72,7 +67,7 @@ impl RouteStrategy for WeightedRoundRobin {
         return String::from(consts::WEIGHTED_ROUND_ROBIN);
     }
 
-    fn pick(&mut self, endpoints: &Vec<Arc<Box<dyn Endpoint>>>) -> Option<Arc<Box<dyn Endpoint>>> {
+    fn pick(&mut self, _ctx: &StrategyContext, endpoints: &Vec<Arc<Box<dyn Endpoint>>>) -> Option<Arc<Box<dyn Endpoint>>> {
         let guard = self.guard.lock();
         if guard.is_err() {
             return None;
@@ -103,6 +98,7 @@ impl RouteStrategy for WeightedRoundRobin {
 mod round_robin_test {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+    use crate::consts::WEIGHTED_ROUND_ROBIN;
     use crate::endpoint::MockEndpoint;
 
     use super::*;
@@ -115,7 +111,6 @@ mod round_robin_test {
 
     #[test]
     fn test_name() {
-        assert_eq!(WEIGHTED_ROUND_ROBIN, WeightedRoundRobin::name());
         assert_eq!(WEIGHTED_ROUND_ROBIN, WeightedRoundRobin::new().name());
     }
     #[test]
@@ -151,7 +146,7 @@ mod round_robin_test {
         for data in dataset {
             let mut weighted_round_robin = WeightedRoundRobin::new();
             for expectation in data.addr_expectation {
-                let target = weighted_round_robin.pick(&data.endpoints);
+                let target = weighted_round_robin.pick(&StrategyContext::new(String::new()), &data.endpoints);
                 assert_eq!(target.unwrap().addr(), expectation, "test set: {}", data.name)
             }
         }

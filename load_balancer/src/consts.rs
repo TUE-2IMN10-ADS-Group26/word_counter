@@ -11,6 +11,7 @@ pub const HEALTH_CHECK_INTERVAL_MS: Duration = Duration::from_millis(500);
 pub const DEFAULT_STRATEGY: &str = "RoundRobin";
 pub const ROUND_ROBIN: &str = "RoundRobin";
 pub const WEIGHTED_ROUND_ROBIN: &str = "WeightedRoundRobin";
+pub const HASH_BY_REQUEST: &str = "HashByRequest";
 
 // config files
 pub const CONFIG_PATH_ENDPOINTS: &str = "src/config/endpoints.toml";

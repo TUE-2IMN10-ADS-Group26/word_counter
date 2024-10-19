@@ -7,7 +7,7 @@ use prometheus::{Encoder, TextEncoder};
 use tracing_appender::non_blocking::WorkerGuard;
 use warp::Filter;
 
-use crate::consts::{CONFIG_PATH_ENDPOINTS, CONFIG_PATH_LOAD_BALANCER, CONFIG_PATH_SERVER, ROUND_ROBIN, WEIGHTED_ROUND_ROBIN};
+use crate::consts::{CONFIG_PATH_ENDPOINTS, CONFIG_PATH_LOAD_BALANCER, CONFIG_PATH_SERVER, ROUND_ROBIN, WEIGHTED_ROUND_ROBIN, HASH_BY_REQUEST};
 use crate::endpoint::{Endpoint, WordCountServer};
 use crate::load_balancer::{LoadBalancer, LoadBalancerImpl};
 use crate::model::endpoints_config::EndpointPoolConfig;
@@ -17,6 +17,7 @@ use crate::server::LBServer;
 use crate::strategy::round_robin::RoundRobin;
 use crate::strategy::RouteStrategy;
 use crate::strategy::weighted_round_robin::WeightedRoundRobin;
+use crate::strategy::hash_lb::HashByRequest;
 
 mod endpoint;
 mod load_balancer;
@@ -128,6 +129,7 @@ impl AppBuilder {
         tracing::info!(strategy, "strategy created");
         match strategy.as_str() {
             WEIGHTED_ROUND_ROBIN => Box::new(WeightedRoundRobin::new()),
+            HASH_BY_REQUEST => Box::new(HashByRequest::new()),
             ROUND_ROBIN | _ => Box::new(RoundRobin::new(None)),
         }
     }

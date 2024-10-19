@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::consts;
 use crate::endpoint::Endpoint;
+use crate::strategy::context::StrategyContext;
 use crate::strategy::RouteStrategy;
 
 #[derive(Default)]
@@ -16,18 +17,13 @@ impl RoundRobin {
             idx: idx.unwrap_or_default()
         }
     }
-
-    #[allow(dead_code)]
-    pub fn name() -> String {
-        String::from(consts::ROUND_ROBIN)
-    }
 }
 
 impl RouteStrategy for RoundRobin {
     fn name(&self) -> String {
         String::from(consts::ROUND_ROBIN)
     }
-    fn pick(&mut self, endpoints: &Vec<Arc<Box<dyn Endpoint>>>) -> Option<Arc<Box<dyn Endpoint>>> {
+    fn pick(&mut self, _ctx: &StrategyContext, endpoints: &Vec<Arc<Box<dyn Endpoint>>>) -> Option<Arc<Box<dyn Endpoint>>> {
         let curr_idx = self.idx.fetch_add(1, Ordering::SeqCst) % endpoints.len();
         endpoints.get(curr_idx).map(|endpoint| { Arc::clone(endpoint) })
     }
@@ -50,7 +46,6 @@ mod round_robin_test {
 
     #[test]
     fn test_name() {
-        assert_eq!(consts::ROUND_ROBIN, RoundRobin::name());
         assert_eq!(consts::ROUND_ROBIN, RoundRobin::new(None).name());
     }
     #[test]
@@ -127,7 +122,7 @@ mod round_robin_test {
         ];
         for data in dataset {
             let mut round_robin = RoundRobin::new(data.start_idx);
-            let target = round_robin.pick(&data.endpoints);
+            let target = round_robin.pick(&StrategyContext::new(String::new()), &data.endpoints);
             assert_eq!(target.unwrap().addr(), data.addr_expectation, "test set: {}", data.name)
         }
     }

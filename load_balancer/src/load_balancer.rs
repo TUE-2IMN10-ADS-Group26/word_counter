@@ -10,6 +10,7 @@ use futures::future::join_all;
 
 use crate::consts::HEALTH_CHECK_INTERVAL_MS;
 use crate::endpoint::Endpoint;
+use crate::strategy::context::StrategyContext;
 use crate::strategy::RouteStrategy;
 
 #[async_trait]
@@ -43,9 +44,9 @@ impl LoadBalancerImpl
         }
     }
 
-    async fn pick_endpoint(&self) -> Option<Arc<Box<dyn Endpoint>>> {
+    async fn pick_endpoint(&self, ctx: &StrategyContext) -> Option<Arc<Box<dyn Endpoint>>> {
         let mut strategy = self.router_strategy.lock().await;
-        strategy.pick(&self.filter_healthy_endpoints())
+        strategy.pick(ctx, &self.filter_healthy_endpoints())
     }
 
     fn filter_healthy_endpoints(&self) -> Vec<Arc<Box<dyn Endpoint>>> {
@@ -54,6 +55,10 @@ impl LoadBalancerImpl
             .filter(|endpoint| endpoint.health_report())
             .map(Arc::clone)
             .collect()
+    }
+
+    fn build_strategy_ctx(req: String) -> StrategyContext {
+        StrategyContext::new(req)
     }
 }
 
@@ -64,7 +69,8 @@ impl LoadBalancer for LoadBalancerImpl
         self.router_strategy = Mutex::new(strategy);
     }
     async fn handle(&self, req: String) -> Result<String> {
-        let endpoint = self.pick_endpoint().await.ok_or_else(|| anyhow!("assign endpoint failed, no proper endpoint found"))?;
+        let endpoint = self.pick_endpoint(&Self::build_strategy_ctx(req.clone())).await
+            .ok_or_else(|| anyhow!("assign endpoint failed, no proper endpoint found"))?;
         tracing::info!("[LoadBalancer] request forwarded to server [Name: {}, Addr:{}], request={}", endpoint.name(), endpoint.addr(), req);
         endpoint.handle(&req).await
     }

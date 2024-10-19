@@ -1,4 +1,5 @@
 # supported strategies:
 # - RoundRobin
 # - WeightedRoundRobin
-strategy = "WeightedRoundRobin"
+# - Hash
+strategy = "HashByRequest"
