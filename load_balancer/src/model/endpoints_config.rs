@@ -67,6 +67,7 @@ impl EndpointConfig {
     pub fn ip(&self) -> Ipv4Addr {
         self.ip
     }
+
     #[allow(dead_code)]
     pub fn port(&self) -> u16 {
         self.port
@@ -92,7 +93,7 @@ mod test {
 
     #[test]
     fn test_load() {
-        let pool_config = EndpointPoolConfig::load(Path::new("src/config/endpoints_test.toml"), DEFAULT_STRATEGY);
+        let pool_config = EndpointPoolConfig::load(Path::new("src/config_test/endpoints_test.toml"), DEFAULT_STRATEGY);
         assert!(pool_config.is_ok());
         let dataset = vec![
             EndpointConfig {
@@ -126,6 +127,6 @@ mod test {
 
     #[test]
     fn test_load_failed() {
-        assert!(EndpointPoolConfig::load(Path::new("src/config/endpoints_test_invalid.toml"), DEFAULT_STRATEGY).is_err());
+        assert!(EndpointPoolConfig::load(Path::new("../config_test/endpoints_test_invalid.toml"), DEFAULT_STRATEGY).is_err());
     }
 }

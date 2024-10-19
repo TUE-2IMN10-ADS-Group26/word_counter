@@ -76,7 +76,7 @@ mod test {
 
     #[test]
     fn test_load() {
-        let server_config = ServerConfig::load(Path::new("src/config/server_test.toml"));
+        let server_config = ServerConfig::load(Path::new("src/config_test/server_test.toml"));
         assert!(server_config.is_ok());
         let server_config = server_config.unwrap();
         let expected = ServerConfig {

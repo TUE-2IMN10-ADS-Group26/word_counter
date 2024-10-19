@@ -33,7 +33,7 @@ mod test {
 
     #[test]
     fn test_load() {
-        let lb_config = LBConfig::load(Path::new("src/config/load_balancer_test.toml"));
+        let lb_config = LBConfig::load(Path::new("src/config_test/load_balancer_test.toml"));
         assert!(lb_config.is_ok());
         let lb_config = lb_config.unwrap();
         assert_eq!(lb_config.strategy(), "WeightedRoundRobin");
