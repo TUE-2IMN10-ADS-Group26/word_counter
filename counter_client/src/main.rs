@@ -48,6 +48,8 @@ enum Commands {
         batch: usize,
         #[arg(short, long, help = "target file name")]
         file_name: String,
+        #[arg(short, long, help = "interval(ms) between requests in each thread")]
+        interval: u64,
         #[arg(long, default_value_t = false, help = "if use load balancer")]
         with_lb: bool,
     },
@@ -102,6 +104,13 @@ impl ClientContext {
         None
     }
 
+    fn try_get_interval(&self) -> Option<u64> {
+        if let Commands::Random { interval, .. } = &self.params.command {
+            return Some(interval.clone());
+        }
+        None
+    }
+
     fn get_file_name(&self) -> String {
         match &self.params.command {
             Commands::Count { file_name, .. } => { file_name.clone() }
@@ -138,6 +147,7 @@ async fn exec(client_ctx: &mut ClientContext) {
 async fn exec_random_query(client_ctx: &mut ClientContext) {
     let mut handles = Vec::new();
     let total = client_ctx.try_get_batch_num().unwrap();
+    let interval_ms = client_ctx.try_get_interval().unwrap();
     let bar = build_progress_bar(total);
     for i in 0..total {
         let mut client_ctx = client_ctx.clone();
@@ -150,7 +160,7 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
             bar.set_message(format!("{}", state_message(req, resp)));
         });
         handles.push(handle);
-        thread::sleep(Duration::from_millis(30));
+        thread::sleep(Duration::from_millis(interval_ms));
     }
     join_all(handles).await;
     bar.finish_with_message("🥳 all jobs done!");
