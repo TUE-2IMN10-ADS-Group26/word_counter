@@ -200,7 +200,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -235,7 +235,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.99, sum by(le, server_name) (rate(latency_bucket{handler=\"WordCount\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(le, server_name) (rate(latency_bucket{handler=\"WordCount\", success=\"true\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -427,7 +427,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -462,7 +462,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.99, sum by(le, server_name) (rate(latency_bucket{handler=\"HealthCheck\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(le, server_name) (rate(latency_bucket{handler=\"HealthCheck\", success=\"true\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -490,6 +490,6 @@
   "timezone": "browser",
   "title": "ADS-LAB",
   "uid": "be19ggl148gzkf",
-  "version": 4,
+  "version": 1,
   "weekStart": ""
 }

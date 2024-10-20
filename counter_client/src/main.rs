@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -13,7 +14,7 @@ use futures::future::join_all;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use tokio::time::Instant;
 use tonic::Request;
 use tonic::transport::{Channel, Uri};
@@ -83,7 +84,7 @@ impl ClientContext {
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Some(Duration::from_secs(30)))
-            .timeout(Duration::from_secs(5));
+            .timeout(Duration::from_secs(10));
         let channel = inner_endpoint.connect().await.context("RPC channel connect failed")?;
         Ok(channel)
     }
@@ -152,15 +153,23 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
     let interval_ms = client_ctx.try_get_interval().unwrap();
     let bar = build_progress_bar(total);
     let batch_start = Instant::now();
-    for i in 0..total {
+    let total_process_latency_ms: Arc<AtomicU64> = Arc::new(AtomicU64::default());
+    let idx = Arc::new(Mutex::new(0));
+
+    for _ in 0..total {
         let mut client_ctx = client_ctx.clone();
         let bar = bar.clone();
+        let total_process_latency_ms = Arc::clone(&total_process_latency_ms);
+        let idx = Arc::clone(&idx);
         let handle = tokio::spawn(async move {
             let req = build_random_request(&client_ctx);
             let start = Instant::now();
             let resp = call_count(&mut client_ctx, req.clone()).await;
             let latency = start.elapsed();
-            bar.set_prefix(format!("[{}/{}]", (i + 1).to_string().blue(), total));
+            total_process_latency_ms.fetch_add(latency.as_millis() as u64, Ordering::SeqCst);
+            let mut idx = idx.lock().await;
+            *idx += 1;
+            bar.set_prefix(format!("[{}/{}]", idx.to_string().blue(), total));
             bar.inc(1);
             bar.set_message(format!("{}", state_message(req, resp, latency)));
         });
@@ -168,18 +177,14 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
         thread::sleep(Duration::from_millis(interval_ms));
     }
     join_all(handles).await;
+
     let batch_duration = batch_start.elapsed();
-    let average = cal_average_time(client_ctx, batch_duration);
-    bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳  Average time per query: {}",
+    let average = Duration::from_millis(total_process_latency_ms.load(Ordering::SeqCst) / total as u64);
+
+    bar.set_prefix(format!("[{}/{}]", total.to_string().blue(), total));
+    bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳ Average time per query: {}",
                                     HumanDuration(batch_duration).to_string().blue(),
                                     fmt_latency(average).blue()));
-}
-
-fn cal_average_time(client_ctx: &mut ClientContext, total: Duration) -> Duration {
-    let interval_ms = client_ctx.try_get_interval().unwrap();
-    let batch = client_ctx.try_get_batch_num().unwrap();
-    let average_with_interval = total.as_millis() as u64 / batch as u64;
-    Duration::from_millis(average_with_interval - interval_ms)
 }
 
 fn build_progress_bar(total: usize) -> ProgressBar {
