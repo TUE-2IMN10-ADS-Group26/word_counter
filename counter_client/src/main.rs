@@ -83,7 +83,7 @@ impl ClientContext {
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Some(Duration::from_secs(30)))
-            .timeout(Duration::from_secs(5));
+            .timeout(Duration::from_secs(8));
         let channel = inner_endpoint.connect().await.context("RPC channel connect failed")?;
         Ok(channel)
     }
@@ -170,6 +170,7 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
     join_all(handles).await;
     let batch_duration = batch_start.elapsed();
     let average = cal_average_time(client_ctx, batch_duration);
+    bar.set_prefix(format!("[{}/{}]", total.to_string().blue(), total));
     bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳  Average time per query: {}",
                                     HumanDuration(batch_duration).to_string().blue(),
                                     fmt_latency(average).blue()));
