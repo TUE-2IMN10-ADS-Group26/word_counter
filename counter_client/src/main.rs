@@ -14,7 +14,7 @@ use futures::future::join_all;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use tokio::time::Instant;
 use tonic::Request;
 use tonic::transport::{Channel, Uri};
@@ -154,18 +154,22 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
     let bar = build_progress_bar(total);
     let batch_start = Instant::now();
     let total_process_latency_ms: Arc<AtomicU64> = Arc::new(AtomicU64::default());
+    let idx = Arc::new(Mutex::new(0));
 
-    for i in 0..total {
+    for _ in 0..total {
         let mut client_ctx = client_ctx.clone();
         let bar = bar.clone();
         let total_process_latency_ms = Arc::clone(&total_process_latency_ms);
+        let idx = Arc::clone(&idx);
         let handle = tokio::spawn(async move {
             let req = build_random_request(&client_ctx);
             let start = Instant::now();
             let resp = call_count(&mut client_ctx, req.clone()).await;
             let latency = start.elapsed();
             total_process_latency_ms.fetch_add(latency.as_millis() as u64, Ordering::SeqCst);
-            bar.set_prefix(format!("[{}/{}]", (i + 1).to_string().blue(), total));
+            let mut idx = idx.lock().await;
+            *idx += 1;
+            bar.set_prefix(format!("[{}/{}]", idx.to_string().blue(), total));
             bar.inc(1);
             bar.set_message(format!("{}", state_message(req, resp, latency)));
         });
@@ -178,7 +182,7 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
     let average = Duration::from_millis(total_process_latency_ms.load(Ordering::SeqCst) / total as u64);
 
     bar.set_prefix(format!("[{}/{}]", total.to_string().blue(), total));
-    bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳  Average time per query: {}",
+    bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳ Average time per query: {}",
                                     HumanDuration(batch_duration).to_string().blue(),
                                     fmt_latency(average).blue()));
 }
