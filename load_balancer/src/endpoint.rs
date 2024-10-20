@@ -68,7 +68,7 @@ impl WordCountServer {
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Some(Duration::from_secs(30)))
-            .timeout(Duration::from_secs(2));
+            .timeout(Duration::from_secs(5));
         self.channel = Some(inner_endpoint.connect().await.context("rpc channel connect failed")?);
         Ok(())
     }

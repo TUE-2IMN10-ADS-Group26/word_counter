@@ -6,13 +6,15 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use fake::Fake;
 use fake::faker::lorem::en::Word;
 use futures::future::join_all;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::OnceCell;
+use tokio::time::Instant;
 use tonic::Request;
 use tonic::transport::{Channel, Uri};
 
@@ -81,7 +83,7 @@ impl ClientContext {
         let inner_endpoint = Channel::builder(uri)
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Some(Duration::from_secs(30)))
-            .timeout(Duration::from_secs(2));
+            .timeout(Duration::from_secs(5));
         let channel = inner_endpoint.connect().await.context("RPC channel connect failed")?;
         Ok(channel)
     }
@@ -149,21 +151,35 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
     let total = client_ctx.try_get_batch_num().unwrap();
     let interval_ms = client_ctx.try_get_interval().unwrap();
     let bar = build_progress_bar(total);
+    let batch_start = Instant::now();
     for i in 0..total {
         let mut client_ctx = client_ctx.clone();
         let bar = bar.clone();
         let handle = tokio::spawn(async move {
             let req = build_random_request(&client_ctx);
+            let start = Instant::now();
             let resp = call_count(&mut client_ctx, req.clone()).await;
-            bar.set_prefix(format!("{}/{}", i+1, total));
+            let latency = start.elapsed();
+            bar.set_prefix(format!("[{}/{}]", (i + 1).to_string().blue(), total));
             bar.inc(1);
-            bar.set_message(format!("{}", state_message(req, resp)));
+            bar.set_message(format!("{}", state_message(req, resp, latency)));
         });
         handles.push(handle);
         thread::sleep(Duration::from_millis(interval_ms));
     }
     join_all(handles).await;
-    bar.finish_with_message("🥳 all jobs done!");
+    let batch_duration = batch_start.elapsed();
+    let average = cal_average_time(client_ctx, batch_duration);
+    bar.finish_with_message(format!("🎉 All jobs done!\n\n⏳ Total time: {}\n⏳  Average time per query: {}",
+                                    HumanDuration(batch_duration).to_string().blue(),
+                                    fmt_latency(average).blue()));
+}
+
+fn cal_average_time(client_ctx: &mut ClientContext, total: Duration) -> Duration {
+    let interval_ms = client_ctx.try_get_interval().unwrap();
+    let batch = client_ctx.try_get_batch_num().unwrap();
+    let average_with_interval = total.as_millis() as u64 / batch as u64;
+    Duration::from_millis(average_with_interval - interval_ms)
 }
 
 fn build_progress_bar(total: usize) -> ProgressBar {
@@ -176,19 +192,26 @@ fn build_progress_bar(total: usize) -> ProgressBar {
 
 async fn exec_query(client_ctx: &mut ClientContext) {
     let req = build_request(client_ctx);
+    let start = Instant::now();
     let resp = call_count(client_ctx, req.clone()).await;
-    println!("{}", state_message(req, resp));
+    println!("{}", state_message(req, resp, start.elapsed()));
 }
 
-fn state_message(req: WordCountRequest, resp: Result<WordCountResponse>) -> String {
+fn state_message(req: WordCountRequest, resp: Result<WordCountResponse>, latency: Duration) -> String {
+    let latency = fmt_latency(latency);
     match resp {
         Ok(r) => {
-            format!("✅ call [Count] success, word: {} occur {} times in {}", req.word, r.count, req.file_name)
+            format!("✅ {} in {}: word '{}' occur {} times in {}.", "succeed".green(), latency.green(), req.word, r.count, req.file_name)
         }
         Err(e) => {
-            format!("❌ call [Count] failed, request={:?}, err={:?}", req, e)
+            format!("❌ {}, word: {}, file: {}, err={:?}", "failed".red(), req.word, req.file_name, e)
         }
     }
+}
+
+fn fmt_latency(latency: Duration) -> String {
+    let micros = latency.as_micros();
+    format!("{}.{} ms", micros / 1000, micros % 1000)
 }
 
 async fn call_count(client_ctx: &mut ClientContext, req: WordCountRequest) -> Result<WordCountResponse> {

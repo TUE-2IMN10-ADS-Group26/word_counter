@@ -1,12 +1,14 @@
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use anyhow::Result;
 use deadpool_redis::{Connection, Pool};
 use moka::future::Cache;
-use redis::cmd;
+use redis::{cmd, RedisResult};
+use tokio::time::Instant;
 use tonic::{async_trait, Code, Request, Response, Status};
 
 use word_counter::{WordCountRequest, WordCountResponse};
@@ -42,26 +44,50 @@ impl CounterService {
     }
 
     async fn get_from_cache(&self, key: &str) -> i64 {
-        self.get_from_local_cache(key).await
+        let lc_value = self.get_from_local_cache(key).await;
+        if lc_value >= 0 {
+            tracing::info!("from local cache: [key:{}. value:{}]", key, lc_value);
+        }
+        lc_value
     }
 
     async fn get_from_local_cache(&self, key: &str) -> i64 {
         self.cache.get_with(key.to_string(), async {
-            self.get_from_redis(key).await
+            let redis_value = self.get_from_redis(key).await;
+            if redis_value > 0 {
+                tracing::info!("from redis: [key:{}. value:{}]", key, redis_value);
+            }
+            redis_value
         }).await
     }
 
     async fn get_from_redis(&self, key: &str) -> i64 {
         let conn = self.get_redis_conn().await;
         if conn.is_none() { return FAILED; }
-        cmd("GET").arg(&[key]).query_async(&mut conn.unwrap()).await.unwrap_or_else(
-            |e| {
+        let value: RedisResult<Option<i64>> = cmd("GET").arg(&[key]).query_async(&mut conn.unwrap()).await;
+        match value {
+            Ok(Some(v)) => {
+                v
+            }
+            Ok(None) => {
+                tracing::info!("key: {} not exist in redis", key);
+                FAILED
+            }
+            Err(e) => {
                 tracing::error!("get from redis failed, err={:?}", e);
                 FAILED
             }
-        )
+        }
     }
 
+    async fn set_cache(&self, key: &str, value: i64) {
+        self.set_local_cache(key, value).await;
+        self.set_redis(key, value).await;
+    }
+
+    async fn set_local_cache(&self, key: &str, value: i64) {
+        self.cache.insert(String::from(key), value).await;
+    }
     async fn set_redis(&self, key: &str, value: i64) {
         let expiration_secs = if value == 0 { 30 } else { 300 };
         if let Some(mut conn) = self.get_redis_conn().await {
@@ -76,7 +102,8 @@ impl CounterService {
                     |e| {
                         tracing::error!("set redis failed, err={:?}", e);
                     }
-                )
+                );
+            return;
         }
         tracing::error!("set redis failed: get redis conn failed.");
     }
@@ -94,21 +121,32 @@ impl CounterService {
         let file_name = Path::new(file_name).file_stem().unwrap().to_str().unwrap();
         format!("{}:{}", file_name, word)
     }
+
+    fn fmt_latency(latency: Duration) -> String {
+        let micros = latency.as_micros();
+        format!("{}.{} ms", micros / 1000, micros % 1000)
+    }
 }
 
 #[async_trait]
 impl Counter for CounterService {
     async fn count(&self, request: Request<WordCountRequest>) -> std::result::Result<Response<WordCountResponse>, Status> {
+        let start = Instant::now();
         let req = request.into_inner();
+        tracing::info!("request received: {:#?}", req);
         if let Err(e) = req.check_params().context("request failed with invalid params") {
             return Err(Status::new(Code::FailedPrecondition, format!("{:?}", e)));
         }
         let key = Self::key(&req.file_name, &req.word);
         let mut value = self.get_from_cache(&key).await;
         if value == FAILED {
+            tracing::info!("cache missed, key: {}", key);
             value = self.count_from_file(&req.word, &req.get_file_path()).await;
-            self.set_redis(&key, value).await
+            tracing::info!("count from file, [key: {}, value: {}]", key, value);
+            self.set_cache(&key, value).await
         };
+        let end = start.elapsed();
+        tracing::info!("handle latency: {} for key: {}", Self::fmt_latency(end), key);
         Ok(Response::new(WordCountResponse {
             count: value,
             status_code: 0,

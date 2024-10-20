@@ -7,6 +7,8 @@
 *.rlib
 *.d
 *.lock
+*/output
 # Mac OS X temporary files
 .DS_Store
-*/output
+# large data
+*wiki_2018.txt
