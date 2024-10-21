@@ -156,7 +156,8 @@ impl Endpoint for WordCountServer {
         // metrics
         let mut metrics_guard = QueryCounter::new(&self.name(), "HealthCheck");
 
-        let req = Request::new(HealthCheckRequest::default());
+        let mut req = Request::new(HealthCheckRequest::default());
+        req.set_timeout(Duration::from_millis(100)); // Avoid blocking load balancer health checks due to slow/unhealthy instances.
         let mut status = ServingStatus::NotServing as i32;
         if let Some(mut health_client) = self.health_client() {
             if let Ok(response) = health_client.check(req).await {
