@@ -66,9 +66,8 @@ impl WordCountServer {
         let uri: Uri = Uri::from_str(&format!("http://{}", self.config.get_socket_addr())).context("format endpoint uri failed")?;
         // hardcoded connection configs, todo!
         let inner_endpoint = Channel::builder(uri)
-            .connect_timeout(Duration::from_secs(5))
-            .tcp_keepalive(Some(Duration::from_secs(30)))
-            .timeout(Duration::from_secs(8));
+            .connect_timeout(Duration::from_millis(50))
+            .tcp_keepalive(Some(Duration::from_secs(30)));
         self.channel = Some(inner_endpoint.connect().await.context("rpc channel connect failed")?);
         Ok(())
     }
@@ -142,8 +141,9 @@ impl Endpoint for WordCountServer {
         // metrics
         let mut metrics_guard = QueryCounter::new(&self.name(), "WordCount");
 
-        let req = Self::parse(req)
+        let mut req = Self::parse(req)
             .context(format!("Endpoint handle failed, endpoint name={}, addr={:?}", self.config.name(), self.config.get_socket_addr()))?;
+        req.set_timeout(Duration::from_secs(8));
         let mut client = self.counter_client().ok_or_else(|| anyhow!("handle request failed"))?;
         let resp = client.count(req).await.context("call count service failed")?;
         let resp = serde_json::to_string(resp.get_ref()).context("serialize response failed")?;
@@ -156,7 +156,8 @@ impl Endpoint for WordCountServer {
         // metrics
         let mut metrics_guard = QueryCounter::new(&self.name(), "HealthCheck");
 
-        let req = Request::new(HealthCheckRequest::default());
+        let mut req = Request::new(HealthCheckRequest::default());
+        req.set_timeout(Duration::from_millis(100)); // Avoid blocking load balancer health checks due to slow/unhealthy instances.
         let mut status = ServingStatus::NotServing as i32;
         if let Some(mut health_client) = self.health_client() {
             if let Ok(response) = health_client.check(req).await {
