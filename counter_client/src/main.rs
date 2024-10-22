@@ -8,11 +8,12 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use fake::Fake;
-use fake::faker::lorem::en::Word;
 use futures::future::join_all;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use rand::seq::IndexedRandom;
+use rand::thread_rng;
+use tokio::fs::File;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, OnceCell};
 use tokio::time::Instant;
@@ -61,6 +62,7 @@ enum Commands {
 #[derive(Clone)]
 struct ClientContext {
     params: CliParams,
+    word_list: OnceCell<Vec<String>>,
     client: Arc<OnceCell<CounterClient<Channel>>>,
 }
 
@@ -68,6 +70,7 @@ impl ClientContext {
     fn new(params: CliParams) -> Self {
         ClientContext {
             params,
+            word_list: OnceCell::new(),
             client: Arc::new(OnceCell::new()),
         }
     }
@@ -91,6 +94,21 @@ impl ClientContext {
 
     async fn get_client(&self) -> CounterClient<Channel> {
         self.client.deref().get_or_init(|| async { Self::init_client().await }).await.clone()
+    }
+
+    async fn get_random_word(&self) -> String {
+        let words: Vec<String> = self.word_list.get_or_init(|| async {
+            let file = File::open("src/orchard-street-medium.txt").await.context("word list file not found").unwrap();
+            let reader = BufReader::new(file);
+            let mut lines = reader.lines();
+            let mut words = Vec::new();
+            while let Ok(Some(line)) = lines.next_line().await {
+                words.push(line);
+            }
+            words
+        }).await.clone();
+        if let Some(random_word) = words.choose(&mut thread_rng()) { return String::from(random_word); };
+        panic!("empty word list");
     }
 
     fn try_get_query_word(&self) -> Option<String> {
@@ -162,7 +180,7 @@ async fn exec_random_query(client_ctx: &mut ClientContext) {
         let total_process_latency_ms = Arc::clone(&total_process_latency_ms);
         let idx = Arc::clone(&idx);
         let handle = tokio::spawn(async move {
-            let req = build_random_request(&client_ctx);
+            let req = build_random_request(&client_ctx).await;
             let start = Instant::now();
             let resp = call_count(&mut client_ctx, req.clone()).await;
             let latency = start.elapsed();
@@ -234,9 +252,9 @@ fn build_request(client_ctx: &ClientContext) -> WordCountRequest {
     }
 }
 
-fn build_random_request(client_ctx: &ClientContext) -> WordCountRequest {
+async fn build_random_request(client_ctx: &ClientContext) -> WordCountRequest {
     WordCountRequest {
-        word: Word().fake(),
+        word: client_ctx.get_random_word().await,
         file_name: client_ctx.get_file_name().clone(),
     }
 }
