@@ -1,8 +1,9 @@
+use std::{env, thread};
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -98,7 +99,8 @@ impl ClientContext {
 
     async fn get_random_word(&self) -> String {
         let words: Vec<String> = self.word_list.get_or_init(|| async {
-            let file = File::open("src/orchard-street-medium.txt").await.context("word list file not found").unwrap();
+            let word_list_path = PathBuf::from(&format!("{}", env::var("WORD_LIST_PATH").unwrap_or("src/orchard-street-medium.txt".to_string())));
+            let file = File::open(word_list_path).await.context("word list file not found").unwrap();
             let reader = BufReader::new(file);
             let mut lines = reader.lines();
             let mut words = Vec::new();
