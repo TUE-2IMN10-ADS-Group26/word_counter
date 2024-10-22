@@ -333,8 +333,6 @@
       "options": {
         "legend": {
           "calcs": [
-            "min",
-            "max",
             "mean"
           ],
           "displayMode": "table",
@@ -354,11 +352,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum by(server_name) (rate(query{handler=\"HealthCheck\"}[$__rate_interval]))",
+          "expr": "sum by(server_name, success) (rate(query{handler=\"HealthCheck\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{server_name}}: success={{success}}",
           "range": true,
           "refId": "A",
           "useBackend": false
